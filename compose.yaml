@@ -1,0 +1,21 @@
+# Always-on asset-serve viewer:  docker compose up -d --build
+# Then open http://localhost:7777. It restarts with Docker Desktop.
+services:
+  asset-serve:
+    build: .
+    image: asset-serve:latest
+    container_name: asset-serve
+    restart: unless-stopped
+    ports:
+      # Published on the loopback interface only: not reachable from the network.
+      - "127.0.0.1:7777:7777"
+    environment:
+      # Set to 1 if edits to md files stop showing up live.
+      ASSET_SERVE_POLL: "${ASSET_SERVE_POLL:-0}"
+    volumes:
+      # Registry and preferences (the host CLI writes the registry).
+      - "${HOME}/.asset-serve:/data"
+      # Registered files are stored by absolute host path, so mount them at the
+      # same path, read-only. Files outside this folder show as "missing".
+      # Override with ASSET_SERVE_DOCS=/some/other/dir.
+      - "${ASSET_SERVE_DOCS:-${HOME}/Documents}:${ASSET_SERVE_DOCS:-${HOME}/Documents}:ro"

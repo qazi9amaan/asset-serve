@@ -1,0 +1,725 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@import "highlight.js/styles/github-dark.css";
+/* Google Fonts, bundled locally via @fontsource: works offline, no requests to Google. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/source-serif-4";
+
+:root {
+  color-scheme: dark;
+  /* Soft charcoal, not pure black: pure #000 behind bright text causes glare. */
+  --bg: #141416; /* reading area */
+  --sidebar: #0f0f11; /* a step darker, so no divider line is needed */
+  --surface: #1b1b1e; /* code blocks, diagrams, popovers */
+  --raised: #232327; /* selected rows, segmented controls */
+  --border: #26262a;
+  --line: #1f1f23; /* hairlines: rules, table rows */
+  --text: #e6e6e9; /* body copy: bright enough to read for long stretches */
+  --muted: #8b8b93; /* 6.2:1 on black; lowest-contrast text in the UI */
+  --strong: #f4f4f5; /* headings: bright, but not glaring against the body */
+  --accent: #7dd3fc;
+
+  --font-system: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-ui: "Geist Variable", var(--font-system);
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Reader settings (see src/lib/settings.tsx); set on <html> before first paint. */
+  --reader-font: var(--font-ui);
+  --reader-size: 18px;
+  --reader-width: 66ch;
+}
+html[data-font="system"] {
+  --reader-font: var(--font-system);
+}
+html[data-font="serif"] {
+  --reader-font: "Source Serif 4 Variable", Charter, Georgia, serif;
+}
+html[data-font="mono"] {
+  --reader-font: var(--font-mono);
+}
+html[data-width="narrow"] {
+  --reader-width: 58ch;
+}
+html[data-width="wide"] {
+  --reader-width: 88ch;
+}
+/* Sidebar and outline slide shut instead of popping. Their content keeps a fixed
+   width while the wrapper narrows, so text never reflows mid-transition. */
+.app-sidebar,
+.app-outline {
+  overflow-x: hidden; /* x only: the outline still scrolls vertically (overflow-y-auto) */
+  transition:
+    width 200ms ease,
+    opacity 200ms ease,
+    margin 200ms ease,
+    visibility 0s linear 0s;
+}
+.app-sidebar {
+  width: 20rem; /* = Sidebar's w-80 */
+}
+.app-sidebar > * {
+  flex: none;
+}
+.app-outline > * {
+  width: 16rem; /* = Outline's w-64 */
+}
+html[data-sidebar="off"] .app-sidebar,
+html[data-outline="off"] .app-outline {
+  width: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    width 200ms ease,
+    opacity 200ms ease,
+    margin 200ms ease,
+    visibility 0s linear 200ms;
+}
+/* Cancel the content row's gap-12 so the text stays centred with the outline shut. */
+html[data-outline="off"] .app-outline {
+  margin-left: -3rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar,
+  .app-outline,
+  html[data-sidebar="off"] .app-sidebar,
+  html[data-outline="off"] .app-outline {
+    transition: none;
+  }
+}
+
+/* "Copied!" bubble under the header breadcrumb; fades in, then out after ~1 s. */
+.copied-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 40;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--strong);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -2px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+.copied-bubble.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Thin reading-progress bar pinned to the top of the viewport. Width set from JS. */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  height: 3px;
+  width: 0;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--font-ui);
+}
+
+/* Smooth in-page jumps (outline, search, #anchors). */
+.scroll-smooth-pane {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-smooth-pane {
+    scroll-behavior: auto;
+  }
+}
+
+::selection {
+  background: #7dd3fc40;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2e2e33 transparent;
+}
+
+.palette-in {
+  animation: palette-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+/* ---------- Markdown ---------- */
+
+.md {
+  color: var(--text);
+  font-family: var(--reader-font);
+  font-size: var(--reader-size);
+  line-height: 1.7;
+  max-width: var(--reader-width); /* in ch, so the measure follows font and size */
+  margin-inline: auto;
+  /* break-word, not anywhere: anywhere shrinks table columns until code splits mid-name */
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+  font-optical-sizing: auto;
+}
+html[data-font="mono"] .md {
+  font-size: calc(var(--reader-size) * 0.88);
+  line-height: 1.7;
+}
+
+.md-block > :first-child {
+  margin-top: 0;
+}
+.md-block + .md-block {
+  margin-top: 1.25em;
+}
+/* Headings sit closer to the content they introduce than to what came before. */
+.md-block + .md-block:has(> h2) {
+  margin-top: 2.4em;
+}
+.md-block + .md-block:has(> h3) {
+  margin-top: 1.8em;
+}
+.md-block + .md-block:has(> :is(h4, h5, h6)) {
+  margin-top: 1.4em;
+}
+.md-block:has(> :is(h1, h2, h3, h4, h5, h6)) + .md-block {
+  margin-top: 0.6em;
+}
+.md-block:has(> h1) + .md-block {
+  margin-top: 0.9em;
+}
+/* A rule already separates sections; don't stack heading space on top of it. */
+.md-block:has(> hr) + .md-block {
+  margin-top: 0;
+}
+
+.md-enter {
+  animation: md-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes md-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .md-enter,
+  .palette-in {
+    animation: none;
+  }
+}
+
+.md :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--strong);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  scroll-margin-top: 24px;
+  margin: 0;
+}
+.md h1 {
+  font-size: 2.3em;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.md h2 {
+  font-size: 1.6em;
+  text-wrap: balance;
+}
+.md h3 {
+  font-size: 1.25em;
+}
+.md :is(h4, h5, h6) {
+  font-size: 1.05em;
+}
+html[data-font="serif"] .md :is(h1, h2, h3) {
+  letter-spacing: -0.01em;
+}
+
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md pre {
+  margin: 0;
+}
+.md p + p {
+  margin-top: 1.25em;
+}
+
+.md strong {
+  color: var(--strong);
+  font-weight: 650;
+}
+
+/* Colour marks the link; the underline arrives on hover. */
+.md a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms ease;
+}
+.md a:hover,
+.md a:focus-visible {
+  text-decoration-color: currentColor;
+}
+
+.md ul,
+.md ol {
+  padding-left: 1.5em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.45em 0;
+  padding-left: 0.2em;
+}
+.md li::marker {
+  color: var(--muted);
+}
+.md ol > li::marker {
+  font-variant-numeric: tabular-nums;
+}
+.md li > :is(ul, ol) {
+  margin-top: 0.35em;
+  margin-bottom: 0.1em;
+}
+.md li > :is(ul, ol) > li {
+  margin: 0.25em 0;
+}
+.md li > p + p {
+  margin-top: 0.5em;
+}
+.md li.task-list-item {
+  list-style: none;
+  margin-left: -1.5em;
+}
+.md input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin-right: 0.5em;
+  transform: translateY(1px);
+}
+
+.md blockquote {
+  border-left: 3px solid #3f3f46;
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75em 1.1em;
+  color: #c4c4cb;
+}
+.md blockquote > :is(p, ul, ol) + :is(p, ul, ol) {
+  margin-top: 0.6em;
+}
+/* A quote whose only content is a callout: drop the quote's own chrome, so just
+   the callout's single tint shows (callouts.ts normally prevents this nesting). */
+.md blockquote:has(> .callout:only-child) {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.md hr {
+  height: 1px;
+  border: 0;
+  background: var(--border);
+  margin: 2em 0;
+}
+
+.md :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  background: rgba(255, 255, 255, 0.08); /* a pill, so code reads as part of the sentence */
+  border-radius: 5px;
+  padding: 0.12em 0.4em;
+  color: #e4e4e8;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/* In headings, code is part of the title: same colour and weight, no chip. */
+.md :is(h1, h2, h3, h4, h5, h6) code {
+  font-size: 0.86em;
+  font-weight: 650;
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.md img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+/* Inline badges/icons inside a sentence stay inline. */
+.md p > img:not(:only-child) {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Code blocks */
+.md-code {
+  position: relative;
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.md-code-bar {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.md-code:hover .md-code-bar,
+.md-code:focus-within .md-code-bar {
+  opacity: 1;
+}
+@media (hover: none) {
+  .md-code-bar {
+    opacity: 1;
+  }
+}
+.md-code-bar button {
+  color: #a1a1aa;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #ffffff0f;
+}
+.md-code-bar button:hover {
+  color: var(--strong);
+}
+.md-pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  line-height: 1.65;
+  background: var(--surface);
+  border-radius: 12px;
+}
+.md-code .md-pre {
+  border-radius: 0;
+}
+.md .hljs {
+  background: transparent;
+  padding: 0;
+}
+
+/* Tables */
+.md-table {
+  overflow-x: auto;
+  border-radius: 8px;
+}
+/* Long tables start folded: a fixed-height scroll box, so the header can stick. */
+.md-table.is-folded {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.md table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.88em;
+}
+.md thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  text-align: left;
+  font-weight: 600;
+  color: var(--strong);
+  border-bottom: 1px solid #303035;
+}
+.md :is(th, td) {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  line-height: 1.55;
+  min-width: 8rem;
+}
+.md tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+.md-table-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--muted);
+  border-radius: 6px;
+}
+.md-table-toggle:hover {
+  color: var(--strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+/* Identifiers in cells stay whole; the table scrolls sideways instead. */
+.md td code {
+  white-space: nowrap;
+}
+.md tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Mermaid */
+.md-mermaid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+.md-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Math */
+.md .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+/* Footnotes */
+.md section.footnotes {
+  margin-top: 2.5em;
+  padding-top: 1em;
+  border-top: 1px solid var(--border);
+  font-size: 0.88em;
+  color: var(--muted);
+}
+
+/* Phones: same proportions, a touch smaller so lines aren't 4 words long. */
+@media (max-width: 640px) {
+  .md {
+    font-size: calc(var(--reader-size) * 0.92);
+  }
+  .md h1 {
+    font-size: 2em;
+  }
+}
+
+/* ---------- Reading aids ---------- */
+
+/* "6 min read · 1,240 words" under the title */
+.md .md-meta {
+  margin-top: 0.5em;
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+/* The meta line sits between blocks, so restore the gap the block rules would give. */
+.md .md-meta + .md-block {
+  margin-top: 1.4em;
+}
+
+/* Heading "#" link: appears on hover, copies a link to the section */
+.md .md-anchor {
+  margin-left: 0.4em;
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.md :is(h2, h3, h4):hover .md-anchor,
+.md .md-anchor:focus-visible {
+  opacity: 1;
+}
+.md .md-anchor:hover {
+  color: var(--accent);
+}
+
+/* Collapsible sections: chevron in the left margin of each H2 */
+.md-block[data-head] {
+  position: relative;
+}
+.md-fold {
+  position: absolute;
+  top: 0.55em;
+  left: -1.9rem;
+  display: flex;
+  height: 1.4rem;
+  width: 1.4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 150ms ease, transform 200ms ease, background-color 150ms ease;
+}
+.md-block[data-head]:hover .md-fold,
+.md-fold:focus-visible,
+.md-fold[aria-expanded="false"] {
+  opacity: 1;
+}
+.md-fold:hover {
+  background: #ffffff10;
+  color: var(--strong);
+}
+.md-fold[aria-expanded="false"] {
+  transform: rotate(-90deg);
+}
+@media (hover: none), (max-width: 640px) {
+  /* No hover on touch, and no margin on phones: put the chevron after the heading. */
+  .md-fold {
+    position: static;
+    float: right;
+    margin-top: 0.35em;
+    opacity: 1;
+  }
+}
+.md-fold-hint {
+  margin-top: 0.4em;
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  color: var(--muted);
+}
+.md-fold-hint:hover {
+  color: var(--accent);
+}
+
+/* ---------- Callouts ---------- */
+
+/* Left rule + a faint tint of the same hue. No outer border, square left edge. */
+.md .callout {
+  --tone: #3b82f6;
+  --tint: rgba(59, 130, 246, 0.06);
+  margin: 0;
+  padding: 0.9em 1.15em 0.95em 1.1em;
+  border: 0;
+  border-left: 3px solid var(--tone);
+  border-radius: 0 8px 8px 0;
+  background: var(--tint);
+  color: var(--text);
+}
+.md .callout-tip {
+  --tone: #22c55e;
+  --tint: rgba(34, 197, 94, 0.06);
+}
+.md .callout-important {
+  --tone: #a78bfa;
+  --tint: rgba(167, 139, 250, 0.06);
+}
+.md .callout-warning {
+  --tone: #f59e0b;
+  --tint: rgba(251, 191, 36, 0.06);
+}
+.md .callout-caution {
+  --tone: #ef4444;
+  --tint: rgba(239, 68, 68, 0.06);
+}
+.md .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  margin-bottom: 0.3em;
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--tone);
+}
+.md .callout-title::before {
+  content: "i";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15em;
+  height: 1.15em;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+.md .callout-tip .callout-title::before {
+  content: "✓";
+}
+.md :is(.callout-warning, .callout-caution) .callout-title::before {
+  content: "!";
+}
+.md .callout-important .callout-title::before {
+  content: "★";
+  border: 0;
+}
+.md .callout > :is(p, ul, ol) + :is(p, ul, ol) {
+  margin-top: 0.6em;
+}
+
+/* ---------- Long code and tables ---------- */
+
+.md-code.is-folded .md-pre {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+.md-code-toggle {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.md-code-toggle:hover {
+  color: var(--strong);
+}
+
+/* Row highlight so the eye can follow a wide row across */
+.md tbody tr {
+  transition: background-color 120ms ease;
+}
+.md tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
