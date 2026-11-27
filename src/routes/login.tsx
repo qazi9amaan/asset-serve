@@ -40,6 +40,22 @@ function page(error: boolean): Response {
   return new Response(html, { status: error ? 401 : 200, headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
+// Simple in-memory rate limiter for login attempts. 5 attempts per IP per 15 min.
+const MAX_ATTEMPTS = 5
+const WINDOW_MS = 15 * 60 * 1000
+const attempts = new Map<string, { count: number; resetAt: number }>()
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  const entry = attempts.get(ip)
+  if (!entry || now > entry.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: now + WINDOW_MS })
+    return false
+  }
+  entry.count++
+  return entry.count > MAX_ATTEMPTS
+}
+
 export const Route = createFileRoute('/login')({
   server: {
     handlers: {
@@ -50,6 +66,8 @@ export const Route = createFileRoute('/login')({
       POST: async ({ request }) => {
         const password = process.env.ASSET_SERVE_PASSWORD
         if (!password) return new Response(null, { status: 302, headers: { location: '/' } })
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+        if (isRateLimited(ip)) return new Response('Too many attempts. Try again later.', { status: 429, headers: { 'content-type': 'text/plain', 'retry-after': '900' } })
         const submitted = String((await request.formData()).get('password') ?? '')
         const { passwordMatches, sessionCookie } = await import('#/server/auth')
         if (!passwordMatches(submitted, password)) return page(true)
