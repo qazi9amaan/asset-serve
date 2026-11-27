@@ -130,7 +130,7 @@ function FileView({ initial }: { initial: FileContent }) {
       <div ref={progressBar} aria-hidden className="reading-progress" />
       <header className="flex h-12 items-center gap-2 px-3 md:px-4">
         <SidebarToggle />
-        <PathCrumb path={file.path} />
+        <PathCrumb path={file.path} id={file.id} />
         <span className="ml-auto flex shrink-0 items-center gap-2 pr-1 text-xs text-[var(--muted)]">
           <ConnectionNotice />
           <span
@@ -189,7 +189,7 @@ function FileView({ initial }: { initial: FileContent }) {
 
 // Folder path muted and cut from the left; the file name always stays visible.
 // Click copies just the file name, with a "Copied!" bubble that fades after ~1 s.
-function PathCrumb({ path }: { path: string }) {
+function PathCrumb({ path, id }: { path: string; id: string }) {
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -199,9 +199,9 @@ function PathCrumb({ path }: { path: string }) {
   return (
     <button
       type="button"
-      title={`Copy file name: ${name}`}
+      title={`Copy id: ${id}`}
       onClick={() => {
-        void navigator.clipboard.writeText(name)
+        void navigator.clipboard.writeText(id)
         setCopied(true)
         clearTimeout(timer.current)
         timer.current = setTimeout(() => setCopied(false), 1000)
