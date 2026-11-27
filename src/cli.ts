@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Command } from 'commander'
@@ -101,6 +101,17 @@ program
     for (const e of files) if (targets.has(e.id)) console.log(`removed  ${e.id}  ${e.path}`)
     if (kept.length === files.length) throw new Error('Nothing matched.')
     writeRegistry(kept)
+  })
+
+program
+  .command('get')
+  .argument('<id>', 'file id (the /f/<id> in a viewer link, or from `list`)')
+  .description('print a registered file’s markdown to stdout')
+  .action((id: string) => {
+    const entry = readRegistry().find((e) => e.id === id)
+    if (!entry) throw new Error(`No file with id: ${id}`)
+    if (!existsSync(entry.path)) throw new Error(`File is missing on disk: ${entry.path}`)
+    process.stdout.write(readFileSync(entry.path, 'utf8'))
   })
 
 program
