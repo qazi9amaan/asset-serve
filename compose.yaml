@@ -2,8 +2,11 @@
 # Then open http://localhost:7777. It restarts with Docker Desktop.
 services:
   asset-serve:
+    # Build locally (default):
     build: .
     image: asset-serve:latest
+    # Or pull the prebuilt image instead of `build: .`:
+    # image: ghcr.io/qazi9amaan/asset-serve:latest
     container_name: asset-serve
     restart: unless-stopped
     ports:
@@ -12,6 +15,8 @@ services:
     environment:
       # Set to 1 if edits to md files stop showing up live.
       ASSET_SERVE_POLL: "${ASSET_SERVE_POLL:-0}"
+      # Set a password to require login. Leave unset for open access.
+      ASSET_SERVE_PASSWORD: "${ASSET_SERVE_PASSWORD:-}"
     volumes:
       # Registry and preferences (the host CLI writes the registry).
       - "${HOME}/.asset-serve:/data"
