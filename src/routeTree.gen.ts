@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as FIdRouteImport } from './routes/f.$id'
 import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
@@ -17,6 +18,11 @@ import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
@@ -37,12 +43,14 @@ const ApiAssetIdRoute = ApiAssetIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
   '/f/$id': typeof FIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
   '/f/$id': typeof FIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
   '/f/$id': typeof FIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/events' | '/f/$id' | '/api/asset/$id'
+  fullPaths: '/' | '/login' | '/api/events' | '/f/$id' | '/api/asset/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/events' | '/f/$id' | '/api/asset/$id'
-  id: '__root__' | '/' | '/api/events' | '/f/$id' | '/api/asset/$id'
+  to: '/' | '/login' | '/api/events' | '/f/$id' | '/api/asset/$id'
+  id: '__root__' | '/' | '/login' | '/api/events' | '/f/$id' | '/api/asset/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   ApiEventsRoute: typeof ApiEventsRoute
   FIdRoute: typeof FIdRoute
   ApiAssetIdRoute: typeof ApiAssetIdRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/events': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   ApiEventsRoute: ApiEventsRoute,
   FIdRoute: FIdRoute,
   ApiAssetIdRoute: ApiAssetIdRoute,
@@ -113,10 +131,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

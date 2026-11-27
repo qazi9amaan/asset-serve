@@ -104,7 +104,15 @@ reload, on any port, and in any browser on this machine.
   that use link references or footnotes render as one block, because those
   links point across blocks.
 
-| Env var            | Default          |
-| ------------------ | ---------------- |
-| `ASSET_SERVE_HOME` | `~/.asset-serve` |
-| `ASSET_SERVE_PORT` | `7777` for `serve`/`open`, `3000` for `serve --dev` |
+| Env var                | Default          |
+| ---------------------- | ---------------- |
+| `ASSET_SERVE_HOME`     | `~/.asset-serve` |
+| `ASSET_SERVE_PORT`     | `7777` for `serve`/`open`, `3000` for `serve --dev` |
+| `ASSET_SERVE_PASSWORD` | unset (open access) |
+
+## Password
+
+Set `ASSET_SERVE_PASSWORD` to lock the viewer behind a login page; leave it
+unset and the app is fully open, as before. On the right password a signed,
+HttpOnly session cookie is set (30 days). With Docker, set it in `compose.yaml`
+or your shell: `ASSET_SERVE_PASSWORD=secret docker compose up -d`.
