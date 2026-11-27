@@ -11,8 +11,11 @@ const MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 // the server (the cookie is a derived digest, not the password).
 const tokenFor = (password: string) => createHmac('sha256', password).update(password).digest('hex')
 
-const safeEqual = (a: string, b: string) =>
-  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
+const safeEqual = (a: string, b: string) => {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB)
+}
 
 export const sessionCookie = (password: string) =>
   `${COOKIE}=${tokenFor(password)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${MAX_AGE}`
