@@ -1,9 +1,12 @@
 // Interactive action dispatch. Server-only: fns.ts imports it dynamically, so
 // the handler map and the token secret never reach the client bundle.
 import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { getEntry, type Entry } from '../lib/registry.ts'
+import { join } from 'node:path'
+import { HOME_DIR, getEntry, type Entry } from '../lib/registry.ts'
 import { signActionToken, verifyActionToken } from './auth.ts'
+import { headFor } from './roadmap.ts'
 
 export interface ActionEvent {
   event_id: string
@@ -23,6 +26,7 @@ export interface ActionRequest {
   nonce: string
   token: string
   feedback: string
+  head?: string
 }
 
 export type DispatchResult = ({ ok: true } & Verdict) | { ok: false; error: string }
@@ -32,16 +36,40 @@ const handlers = new Map<string, ActionHandler>()
 
 export const registerHandler = (name: string, fn: ActionHandler) => void handlers.set(name, fn)
 
-export type IssuedAction = { id: string; label: string; nonce: string; token: string }
+// Spent nonces, persisted so a restart can't replay a token. Capped: old tokens
+// are bound to old revisions and fail the signature check anyway.
+const NONCES_PATH = join(HOME_DIR, 'spent-nonces.json')
+const MAX_NONCES = 10_000
 
-// Signs one token per action for this exact revision, for the viewer to send back.
+function readSpent(): string[] {
+  try {
+    const data = JSON.parse(readFileSync(NONCES_PATH, 'utf8'))
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+function writeSpent(nonces: string[]): void {
+  mkdirSync(HOME_DIR, { recursive: true })
+  const tmp = `${NONCES_PATH}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify(nonces.slice(-MAX_NONCES)))
+  renameSync(tmp, NONCES_PATH)
+}
+
+export const clearSpentNonces = () => writeSpent([])
+
+export type IssuedAction = { id: string; label: string; nonce: string; token: string; head: string }
+
+// Signs one token per action for this exact revision (and roadmap HEAD), for the viewer to send back.
 // Null for read-only entries, or when no secret is set (doc then shows without buttons).
 export function issueActions(entry: Entry, revision: number): IssuedAction[] | null {
   if (!entry.interactive || !entry.actions?.length) return null
   try {
+    const head = headFor(entry.path)
     return entry.actions.map(({ id, label }) => {
       const nonce = randomUUID()
-      return { id, label, nonce, token: signActionToken({ asset_id: entry.id, revision, action_id: id, nonce }) }
+      return { id, label, nonce, head, token: signActionToken({ asset_id: entry.id, revision, action_id: id, nonce, head }) }
     })
   } catch {
     return null
@@ -61,10 +89,18 @@ export async function dispatchAction(req: ActionRequest): Promise<DispatchResult
     return { ok: false, error: 'File is missing on disk.' }
   }
 
+  let head: string
+  try {
+    head = headFor(entry.path)
+  } catch {
+    return { ok: false, error: "Couldn't read the roadmap's git revision." }
+  }
+  if ((req.head ?? '') !== head) return { ok: false, error: 'The roadmap moved on since you loaded it. Reload and try again.' }
+
   // Signed against the current revision, so a token from an older version of the file fails.
   let valid = false
   try {
-    valid = verifyActionToken(req.token, { asset_id: entry.id, revision, action_id: req.actionId, nonce: req.nonce })
+    valid = verifyActionToken(req.token, { asset_id: entry.id, revision, action_id: req.actionId, nonce: req.nonce, head })
   } catch {
     return { ok: false, error: 'Actions are not configured on this server (ASSET_SERVE_SECRET is not set).' }
   }
@@ -72,6 +108,11 @@ export async function dispatchAction(req: ActionRequest): Promise<DispatchResult
 
   const handler = entry.callback && handlers.get(entry.callback.handler)
   if (!entry.callback || !handler) return { ok: false, error: 'No registered handler for this file.' }
+
+  // Check and mark in one synchronous step, so two clicks can't both pass.
+  const spent = readSpent()
+  if (spent.includes(req.nonce)) return { ok: false, error: 'This action was already used. Reload the file to act again.' }
+  writeSpent([...spent, req.nonce])
 
   const event: ActionEvent = {
     event_id: randomUUID(),

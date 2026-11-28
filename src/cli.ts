@@ -122,6 +122,19 @@ program
   })
 
 program
+  .command('roadmap')
+  .description('commit a roadmap revision read from stdin (first one creates the product repo)')
+  .argument('<product>', 'product name, the repo folder under the roadmaps dir')
+  .argument('<file>', 'markdown file name inside that repo, e.g. roadmap.md')
+  .action(async (product: string, file: string) => {
+    const { writeRoadmap } = await import('./server/roadmap.ts')
+    const chunks: Buffer[] = []
+    for await (const c of process.stdin) chunks.push(c as Buffer)
+    const { path, head } = writeRoadmap(product, file, Buffer.concat(chunks).toString('utf8'))
+    console.log(`committed ${head}  ${path}  (id ${idFor(path)})`)
+  })
+
+program
   .command('list')
   .alias('ls')
   .description('list registered files')
