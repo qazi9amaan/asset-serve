@@ -2,8 +2,8 @@
 // the handler map and the token secret never reach the client bundle.
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
-import { getEntry } from '../lib/registry.ts'
-import { verifyActionToken } from './auth.ts'
+import { getEntry, type Entry } from '../lib/registry.ts'
+import { signActionToken, verifyActionToken } from './auth.ts'
 
 export interface ActionEvent {
   event_id: string
@@ -31,6 +31,22 @@ export type DispatchResult = ({ ok: true } & Verdict) | { ok: false; error: stri
 const handlers = new Map<string, ActionHandler>()
 
 export const registerHandler = (name: string, fn: ActionHandler) => void handlers.set(name, fn)
+
+export type IssuedAction = { id: string; label: string; nonce: string; token: string }
+
+// Signs one token per action for this exact revision, for the viewer to send back.
+// Null for read-only entries, or when no secret is set (doc then shows without buttons).
+export function issueActions(entry: Entry, revision: number): IssuedAction[] | null {
+  if (!entry.interactive || !entry.actions?.length) return null
+  try {
+    return entry.actions.map(({ id, label }) => {
+      const nonce = randomUUID()
+      return { id, label, nonce, token: signActionToken({ asset_id: entry.id, revision, action_id: id, nonce }) }
+    })
+  } catch {
+    return null
+  }
+}
 
 export async function dispatchAction(req: ActionRequest): Promise<DispatchResult> {
   const entry = getEntry(req.id)

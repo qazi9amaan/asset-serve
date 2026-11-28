@@ -10,7 +10,7 @@ process.env.ASSET_SERVE_SECRET = 'test-secret'
 // HOME_DIR is read at import time, so import after setting the env.
 const { writeRegistry } = await import('../src/lib/registry.ts')
 const { signActionToken } = await import('../src/server/auth.ts')
-const { dispatchAction, registerHandler } = await import('../src/server/actions.ts')
+const { dispatchAction, issueActions, registerHandler } = await import('../src/server/actions.ts')
 type ActionEvent = import('../src/server/actions.ts').ActionEvent
 
 const path = join(home, 'plan.md')
@@ -64,4 +64,26 @@ test('unregistered handler name is refused', async () => {
   const res = await dispatchAction(req(tokenFor(statSync(path).mtimeMs)))
   assert.deepEqual(res, { ok: false, error: 'No registered handler for this file.' })
   assert.equal(seen.length, 0)
+})
+
+test('issued tokens are accepted for the current revision', async () => {
+  writeRegistry([entry])
+  seen.length = 0
+  const issued = issueActions(entry, statSync(path).mtimeMs)
+  assert.equal(issued?.length, 1)
+  const [a] = issued!
+  assert.equal(a.label, 'Approve')
+  const res = await dispatchAction({ id: entry.id, actionId: a.id, nonce: a.nonce, token: a.token, feedback: '' })
+  assert.deepEqual(res, { ok: true, verdict: 'accept', message: 'thanks' })
+})
+
+test('read-only entries and an unset secret issue no actions', () => {
+  const plain = { id: entry.id, path, title: entry.title, tags: [], addedAt: entry.addedAt }
+  assert.equal(issueActions(plain, 1), null)
+  delete process.env.ASSET_SERVE_SECRET
+  try {
+    assert.equal(issueActions(entry, 1), null)
+  } finally {
+    process.env.ASSET_SERVE_SECRET = 'test-secret'
+  }
 })

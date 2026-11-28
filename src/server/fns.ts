@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import type { IssuedAction } from '#/server/actions'
 
 export interface FileListItem {
   id: string
@@ -10,7 +11,16 @@ export interface FileListItem {
 }
 
 export type FileContent =
-  | { ok: true; id: string; title: string; path: string; content: string; mtime: number }
+  | {
+      ok: true
+      id: string
+      title: string
+      path: string
+      content: string
+      mtime: number
+      // Only on interactive entries: signed buttons for this exact revision.
+      actions?: IssuedAction[]
+    }
   | { ok: false; id: string; reason: 'not-registered' | 'missing' | 'too-large' }
 
 const MAX_BYTES = 5 * 1024 * 1024
@@ -37,7 +47,11 @@ export const getFile = createServerFn({ method: 'GET' })
       const s = await stat(entry.path)
       if (s.size > MAX_BYTES) return { ok: false, id: data.id, reason: 'too-large' }
       const content = await readFile(entry.path, 'utf8')
-      return { ok: true, id: entry.id, title: entry.title, path: entry.path, content, mtime: s.mtimeMs }
+      const file = { ok: true as const, id: entry.id, title: entry.title, path: entry.path, content, mtime: s.mtimeMs }
+      if (!entry.interactive) return file
+      const { issueActions } = await import('#/server/actions')
+      const actions = issueActions(entry, s.mtimeMs)
+      return actions ? { ...file, actions } : file
     } catch {
       return { ok: false, id: data.id, reason: 'missing' }
     }
