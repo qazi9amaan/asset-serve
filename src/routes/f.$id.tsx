@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ActionBar } from '#/components/ActionBar'
 import { MarkdownView } from '#/components/MarkdownView'
 import { CopyPage } from '#/components/CopyPage'
 import { Outline } from '#/components/Outline'
@@ -57,6 +58,11 @@ function FileView({ initial }: { initial: FileContent }) {
         }
       })
   }
+
+  // Stable wrapper so memoised section heads don't re-render on every FileView render.
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+  const onCommented = useCallback(() => refreshRef.current(), [])
 
   useLiveEvent((e) => {
     if (e.type === 'file' && e.id === initial.id) refresh()
@@ -157,6 +163,8 @@ function FileView({ initial }: { initial: FileContent }) {
           <MarkdownView
             fileId={file.id}
             blocks={parsed!.blocks}
+            commentAction={file.actions?.find((a) => a.id === 'request_changes')}
+            onSubmitted={onCommented}
             meta={
               reading && (
                 <p className="md-meta">
@@ -165,6 +173,7 @@ function FileView({ initial }: { initial: FileContent }) {
               )
             }
           />
+          {file.actions && <ActionBar fileId={file.id} actions={file.actions} />}
         </div>
         <Outline headings={parsed!.headings} scroller={scroller} />
       </div>

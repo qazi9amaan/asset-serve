@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import type { IssuedAction } from '#/server/actions'
 
 export interface FileListItem {
   id: string
@@ -10,7 +11,16 @@ export interface FileListItem {
 }
 
 export type FileContent =
-  | { ok: true; id: string; title: string; path: string; content: string; mtime: number }
+  | {
+      ok: true
+      id: string
+      title: string
+      path: string
+      content: string
+      mtime: number
+      // Only on interactive entries: signed buttons for this exact revision.
+      actions?: IssuedAction[]
+    }
   | { ok: false; id: string; reason: 'not-registered' | 'missing' | 'too-large' }
 
 const MAX_BYTES = 5 * 1024 * 1024
@@ -37,7 +47,11 @@ export const getFile = createServerFn({ method: 'GET' })
       const s = await stat(entry.path)
       if (s.size > MAX_BYTES) return { ok: false, id: data.id, reason: 'too-large' }
       const content = await readFile(entry.path, 'utf8')
-      return { ok: true, id: entry.id, title: entry.title, path: entry.path, content, mtime: s.mtimeMs }
+      const file = { ok: true as const, id: entry.id, title: entry.title, path: entry.path, content, mtime: s.mtimeMs }
+      if (!entry.interactive) return file
+      const { issueActions } = await import('#/server/actions')
+      const actions = issueActions(entry, s.mtimeMs)
+      return actions ? { ...file, actions } : file
     } catch {
       return { ok: false, id: data.id, reason: 'missing' }
     }
@@ -54,6 +68,24 @@ export const deleteFile = createServerFn({ method: 'POST' })
     if (kept.length === files.length) return { removed: false }
     writeRegistry(kept)
     return { removed: true }
+  })
+
+// Runs an agent-defined action: checks the signed token, then forwards an event
+// to the entry's server-side handler and returns its accept/reject verdict.
+export const runAction = createServerFn({ method: 'POST' })
+  .validator((d: { id: string; actionId: string; nonce: string; token: string; head?: string; feedback?: string }) => ({
+    id: String(d.id),
+    actionId: String(d.actionId),
+    nonce: String(d.nonce),
+    token: String(d.token),
+    head: String(d.head ?? ''),
+    feedback: String(d.feedback ?? '').slice(0, 5000),
+  }))
+  .handler(async ({ data }) => {
+    const { dispatchAction } = await import('#/server/actions')
+    // Re-registering just overwrites the same map entry, so this is safe per call.
+    ;(await import('#/server/btr')).registerBtr()
+    return dispatchAction(data)
   })
 
 export interface ContentHit {
