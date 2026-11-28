@@ -22,7 +22,7 @@ export function ActionBar({
   const run = async (actionId: string) => {
     setStatus({ kind: 'processing', action: actionId })
     try {
-      const v = await dispatchAction({ data: { id: fileId, action_id: actionId, feedback } })
+      const v = await dispatchAction({ data: { id: fileId, action_id: actionId, revision, feedback } })
       setStatus({ kind: 'done', ok: v.ok, message: v.message })
       if (v.ok) setFeedback('')
     } catch {

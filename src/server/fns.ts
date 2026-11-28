@@ -64,14 +64,15 @@ export const getFile = createServerFn({ method: 'GET' })
 // Runs one of a doc's registered actions. The server re-checks the action
 // against the registry, so the browser can't invent one.
 export const dispatchAction = createServerFn({ method: 'POST' })
-  .validator((d: { id: string; action_id: string; feedback?: string }) => ({
+  .validator((d: { id: string; action_id: string; revision: number; feedback?: string }) => ({
     id: String(d.id),
     action_id: String(d.action_id),
+    revision: Number(d.revision),
     feedback: String(d.feedback ?? '').slice(0, 10_000),
   }))
   .handler(async ({ data }) => {
     const { dispatch } = await import('#/server/actions')
-    return dispatch(data.id, data.action_id)
+    return dispatch(data.id, data.action_id, data.revision, data.feedback)
   })
 
 // Unregisters a file, like `asset-serve rm`. Only the registry entry goes;

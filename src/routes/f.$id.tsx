@@ -166,6 +166,7 @@ function FileView({ initial }: { initial: FileContent }) {
               )
             }
           />
+          {/* Feedback is sent with an action click, so with no actions there's nothing to send it with. */}
           {file.interactive && !!file.actions?.length && (
             <ActionBar fileId={file.id} revision={file.mtime} actions={file.actions} />
           )}
