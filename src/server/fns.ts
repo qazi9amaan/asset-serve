@@ -10,7 +10,16 @@ export interface FileListItem {
 }
 
 export type FileContent =
-  | { ok: true; id: string; title: string; path: string; content: string; mtime: number }
+  | {
+      ok: true
+      id: string
+      title: string
+      path: string
+      content: string
+      mtime: number
+      interactive?: boolean
+      actions?: { id: string; label: string }[]
+    }
   | { ok: false; id: string; reason: 'not-registered' | 'missing' | 'too-large' }
 
 const MAX_BYTES = 5 * 1024 * 1024
@@ -37,10 +46,32 @@ export const getFile = createServerFn({ method: 'GET' })
       const s = await stat(entry.path)
       if (s.size > MAX_BYTES) return { ok: false, id: data.id, reason: 'too-large' }
       const content = await readFile(entry.path, 'utf8')
-      return { ok: true, id: entry.id, title: entry.title, path: entry.path, content, mtime: s.mtimeMs }
+      return {
+        ok: true,
+        id: entry.id,
+        title: entry.title,
+        path: entry.path,
+        content,
+        mtime: s.mtimeMs,
+        // Only interactive entries carry these; callback stays server-side.
+        ...(entry.interactive ? { interactive: true, actions: entry.actions ?? [] } : {}),
+      }
     } catch {
       return { ok: false, id: data.id, reason: 'missing' }
     }
+  })
+
+// Runs one of a doc's registered actions. The server re-checks the action
+// against the registry, so the browser can't invent one.
+export const dispatchAction = createServerFn({ method: 'POST' })
+  .validator((d: { id: string; action_id: string; feedback?: string }) => ({
+    id: String(d.id),
+    action_id: String(d.action_id),
+    feedback: String(d.feedback ?? '').slice(0, 10_000),
+  }))
+  .handler(async ({ data }) => {
+    const { dispatch } = await import('#/server/actions')
+    return dispatch(data.id, data.action_id)
   })
 
 // Unregisters a file, like `asset-serve rm`. Only the registry entry goes;
