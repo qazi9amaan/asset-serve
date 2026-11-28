@@ -26,3 +26,21 @@ export function isAuthed(request: Request, password: string): boolean {
 }
 
 export const passwordMatches = (submitted: string, password: string) => safeEqual(submitted, password)
+
+// Interactive action tokens: HMAC over the exact asset, revision, action and
+// nonce, keyed by ASSET_SERVE_SECRET. Any changed field (e.g. a newer revision) fails.
+export type ActionScope = { asset_id: string; revision: string | number; action_id: string; nonce: string }
+
+const actionSecret = () => {
+  const secret = process.env.ASSET_SERVE_SECRET
+  if (!secret) throw new Error('ASSET_SERVE_SECRET is not set')
+  return secret
+}
+
+// JSON array encoding keeps field boundaries unambiguous whatever the fields contain.
+const actionMessage = (s: ActionScope) => JSON.stringify([s.asset_id, String(s.revision), s.action_id, s.nonce])
+
+export const signActionToken = (scope: ActionScope) =>
+  createHmac('sha256', actionSecret()).update(actionMessage(scope)).digest('hex')
+
+export const verifyActionToken = (token: string, scope: ActionScope) => safeEqual(token, signActionToken(scope))
