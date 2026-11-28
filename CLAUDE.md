@@ -103,7 +103,7 @@ Ports: built viewer (`serve`, `open`, `pnpm preview`) on **7777**; dev server
 | Path | Role |
 |---|---|
 | `src/lib/registry.ts` | Shared by CLI and server. `~/.asset-serve/registry.json` (override with `ASSET_SERVE_HOME`). Metadata only. id = first 8 hex chars of sha1(absolute path). Atomic write via temp file + rename. |
-| `src/cli.ts`, `bin/asset-serve.mjs` | `add` (file/folder/glob, `--title`, `--tags`), `list`, `rm <id\|path>`, `open`, `serve [--dev]`. The bin is a shim that imports `src/cli.ts`. |
+| `src/cli.ts`, `bin/asset-serve.mjs` | `add` (file/folder/glob, `--title`, `--tags`; opt-in `--interactive`, repeatable `--action id:label`, `--handler` + `--context` which write the optional `interactive`/`actions`/`callback` entry fields, only when given), `list`, `rm <id\|path>`, `open`, `serve [--dev]`. The bin is a shim that imports `src/cli.ts`. |
 | `src/server/hub.ts` | One process-wide chokidar watcher, kept on `globalThis` so it survives HMR. Watches the registry **directory** (rename-based writes) plus every registered file. Throttles per file: leading edge, then at most one event per 100 ms. |
 | `src/routes/api/events.ts` | SSE endpoint, events `{type:'registry'}` and `{type:'file', id}`. 15 s keepalive ping. |
 | `src/routes/api/asset.$id.ts` | `GET /api/asset/<id>?p=<relative path>`: serves images referenced relatively in a registered md file. Resolves `p` against that file's folder with `realpath` on both sides and refuses anything outside that tree (`../`, symlinks, absolute paths, schemes). png/jpg/jpeg/gif/svg/webp only, 20 MB cap, read fresh each time, `nosniff` + sandbox CSP (SVG). `MarkdownView` rewrites relative `<img src>` to this route via `FileIdContext`. |
