@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ActionBar } from '#/components/ActionBar'
 import { MarkdownView } from '#/components/MarkdownView'
 import { CopyPage } from '#/components/CopyPage'
 import { Outline } from '#/components/Outline'
@@ -165,6 +166,7 @@ function FileView({ initial }: { initial: FileContent }) {
               )
             }
           />
+          {file.actions && <ActionBar fileId={file.id} actions={file.actions} />}
         </div>
         <Outline headings={parsed!.headings} scroller={scroller} />
       </div>
