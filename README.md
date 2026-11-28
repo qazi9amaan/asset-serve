@@ -56,6 +56,17 @@ a rebuild; they stream in live in both modes.
 Re-adding a file merges new tags. `--title` works only with a single file;
 otherwise the title is the first `# heading`, or the file name.
 
+Opt-in interactive fields (stored in the registry only; the viewer doesn't use them yet):
+
+```bash
+asset-serve add ./task.md --interactive --action run:Run --action stop:Stop \
+  --handler doThing --context ctx1
+```
+
+`--action` repeats and splits on the first `:`. `--handler` and `--context` go
+together. Re-adding with these flags replaces the stored values; without them,
+nothing changes.
+
 ## Using the viewer
 
 | Key | Action |
