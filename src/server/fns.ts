@@ -83,6 +83,8 @@ export const runAction = createServerFn({ method: 'POST' })
   }))
   .handler(async ({ data }) => {
     const { dispatchAction } = await import('#/server/actions')
+    // Re-registering just overwrites the same map entry, so this is safe per call.
+    ;(await import('#/server/btr')).registerBtr()
     return dispatchAction(data)
   })
 
