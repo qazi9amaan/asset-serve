@@ -11,6 +11,11 @@ COPY . .
 RUN pnpm build
 
 FROM node:24-slim
+# git reads the roadmap repos' HEAD for action tokens. The repos are host-owned
+# read-only mounts, so trust them or git refuses with "dubious ownership".
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory '*'
 WORKDIR /app
 ENV NODE_ENV=production \
     ASSET_SERVE_HOME=/data \

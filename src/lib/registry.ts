@@ -11,6 +11,10 @@ export interface Entry {
   title: string
   tags: string[]
   addedAt: string
+  // Opt-in interactive fields. Absent = plain read-only entry, as before.
+  interactive?: boolean
+  actions?: { id: string; label: string }[]
+  callback?: { handler: string; context_id: string }
 }
 
 interface RegistryFile {

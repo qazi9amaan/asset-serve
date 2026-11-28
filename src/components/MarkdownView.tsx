@@ -17,8 +17,11 @@ import rehypeSlug from 'rehype-slug'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { EXPAND_EVENT } from '#/lib/scroll'
+import type { IssuedAction } from '#/server/actions'
+import { parseBlocks, type Heading as HeadingInfo } from './blocks'
 import { remarkCallouts } from './callouts'
 import { Mermaid } from './Mermaid'
+import { SectionComment } from './SectionComment'
 
 const remarkPlugins = [remarkGfm, remarkMath, remarkCallouts]
 const rehypePlugins = [
@@ -184,10 +187,28 @@ interface BlockProps {
   collapsed: boolean
   hiddenCount: number
   onToggle: (section: string) => void
+  /** H2 text and slug, set on section heads only. */
+  heading?: HeadingInfo
+  /** request_changes action; when set, section heads get a comment box. */
+  commentAction?: IssuedAction
+  onSubmitted?: () => void
 }
 
 // One top-level markdown block, memoised on its props (text above all).
-const Block = memo(function Block({ text, enter, section, head, hidden, collapsed, hiddenCount, onToggle }: BlockProps) {
+const Block = memo(function Block({
+  text,
+  enter,
+  section,
+  head,
+  hidden,
+  collapsed,
+  hiddenCount,
+  onToggle,
+  heading,
+  commentAction,
+  onSubmitted,
+}: BlockProps) {
+  const fileId = useContext(FileIdContext)
   return (
     <div
       className={enter ? 'md-block md-enter' : 'md-block'}
@@ -217,6 +238,9 @@ const Block = memo(function Block({ text, enter, section, head, hidden, collapse
       >
         {text}
       </ReactMarkdown>
+      {head && heading && commentAction && fileId && (
+        <SectionComment fileId={fileId} heading={heading} action={commentAction} onSubmitted={onSubmitted} />
+      )}
       {head && section && collapsed && hiddenCount > 0 && (
         <button type="button" className="md-fold-hint" onClick={() => onToggle(section)}>
           Collapsed · Show
@@ -279,7 +303,9 @@ function useSections(keyed: Keyed[]) {
       if (H1.test(b.text)) current = null
       const m = b.text.match(H2)
       if (m) current = `h2:${m[1].trim()}`
-      return { section: current, head: !!m }
+      // Text and slug from the same parser the outline uses, so #anchors match.
+      const heading = m ? parseBlocks(b.text).headings[0] : undefined
+      return { section: current, head: !!m, heading }
     })
     const counts = new Map<string, number>()
     for (const r of rows) if (r.section && !r.head) counts.set(r.section, (counts.get(r.section) ?? 0) + 1)
@@ -287,7 +313,19 @@ function useSections(keyed: Keyed[]) {
   }, [keyed])
 }
 
-export function MarkdownView({ blocks, meta, fileId }: { blocks: string[]; meta?: ReactNode; fileId?: string }) {
+export function MarkdownView({
+  blocks,
+  meta,
+  fileId,
+  commentAction,
+  onSubmitted,
+}: {
+  blocks: string[]
+  meta?: ReactNode
+  fileId?: string
+  commentAction?: IssuedAction
+  onSubmitted?: () => void
+}) {
   const keyed = useKeyedBlocks(blocks)
   const { rows, counts } = useSections(keyed)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
@@ -324,7 +362,7 @@ export function MarkdownView({ blocks, meta, fileId }: { blocks: string[]; meta?
       <article className="md">
         {metaAfter === -1 && meta}
         {keyed.map((b, i) => {
-          const { section, head } = rows[i]
+          const { section, head, heading } = rows[i]
           const isCollapsed = !!section && collapsed.has(section)
           return (
             <Fragment key={b.key}>
@@ -337,6 +375,9 @@ export function MarkdownView({ blocks, meta, fileId }: { blocks: string[]; meta?
                 collapsed={isCollapsed}
                 hiddenCount={section ? (counts.get(section) ?? 0) : 0}
                 onToggle={toggle}
+                heading={heading}
+                commentAction={head ? commentAction : undefined}
+                onSubmitted={head ? onSubmitted : undefined}
               />
               {i === metaAfter && meta}
             </Fragment>

@@ -38,6 +38,44 @@ async function expand(input: string): Promise<string[]> {
 const parseTags = (raw?: string) =>
   (raw ?? '').split(',').map((t) => t.trim()).filter(Boolean)
 
+// "id:label", split on the first colon so labels may contain colons.
+function parseAction(raw: string): { id: string; label: string } {
+  const at = raw.indexOf(':')
+  const id = raw.slice(0, at).trim()
+  const label = raw.slice(at + 1).trim()
+  if (at < 0 || !id || !label) throw new Error(`--action must look like id:label, got: ${raw}`)
+  return { id, label }
+}
+
+interface AddOpts {
+  title?: string
+  tags?: string
+  interactive?: boolean
+  action: string[]
+  handler?: string
+  context?: string
+}
+
+// Only the flags that were given, so a plain `add` writes exactly what it used to.
+function interactiveFields(opts: AddOpts): Pick<Entry, 'interactive' | 'actions' | 'callback'> {
+  const fields: Pick<Entry, 'interactive' | 'actions' | 'callback'> = {}
+  if (opts.interactive) fields.interactive = true
+  if (opts.action.length) {
+    const actions = opts.action.map(parseAction)
+    const ids = actions.map((a) => a.id)
+    const dup = ids.find((id, i) => ids.indexOf(id) !== i)
+    if (dup) throw new Error(`Duplicate --action id: ${dup}`)
+    fields.actions = actions
+  }
+  if (opts.handler !== undefined || opts.context !== undefined) {
+    const handler = opts.handler?.trim()
+    const context_id = opts.context?.trim()
+    if (!handler || !context_id) throw new Error('--handler and --context must be given together.')
+    fields.callback = { handler, context_id }
+  }
+  return fields
+}
+
 const program = new Command()
   .name('asset-serve')
   .description('Register local markdown files and view them live in the browser')
@@ -47,7 +85,12 @@ program
   .argument('<paths...>', 'markdown files, folders or glob patterns')
   .option('-t, --title <title>', 'display title (single file only)')
   .option('--tags <tags>', 'comma-separated tags')
-  .action(async (inputs: string[], opts: { title?: string; tags?: string }) => {
+  .option('--interactive', 'mark the entry as interactive')
+  .option('--action <id:label>', 'add an action button (repeatable)', (v: string, acc: string[]) => [...acc, v], [])
+  .option('--handler <handler>', 'callback handler (needs --context)')
+  .option('--context <context_id>', 'callback context id (needs --handler)')
+  .action(async (inputs: string[], opts: AddOpts) => {
+    const extra = interactiveFields(opts)
     const paths = [...new Set((await Promise.all(inputs.map(expand))).flat())]
     if (paths.length === 0) throw new Error('No markdown files matched.')
     if (opts.title && paths.length > 1) throw new Error('--title only works with a single file.')
@@ -60,6 +103,7 @@ program
       if (existing) {
         if (opts.title) existing.title = opts.title
         existing.tags = [...new Set([...existing.tags, ...tags])]
+        Object.assign(existing, extra)
         console.log(`updated  ${id}  ${path}`)
         continue
       }
@@ -69,11 +113,25 @@ program
         title: opts.title ?? defaultTitle(path),
         tags,
         addedAt: new Date().toISOString(),
+        ...extra,
       }
       files.push(entry)
       console.log(`added    ${id}  ${path}`)
     }
     writeRegistry(files)
+  })
+
+program
+  .command('roadmap')
+  .description('commit a roadmap revision read from stdin (first one creates the product repo)')
+  .argument('<product>', 'product name, the repo folder under the roadmaps dir')
+  .argument('<file>', 'markdown file name inside that repo, e.g. roadmap.md')
+  .action(async (product: string, file: string) => {
+    const { writeRoadmap } = await import('./server/roadmap.ts')
+    const chunks: Buffer[] = []
+    for await (const c of process.stdin) chunks.push(c as Buffer)
+    const { path, head } = writeRoadmap(product, file, Buffer.concat(chunks).toString('utf8'))
+    console.log(`committed ${head}  ${path}  (id ${idFor(path)})`)
   })
 
 program
