@@ -44,3 +44,8 @@ export function parseBlocks(src: string): Parsed {
     .map((n) => src.slice(n.position!.start.offset, n.position!.end.offset))
   return { blocks, headings }
 }
+
+// The dispatch only carries free-text feedback, so a section comment names its
+// section in the first line for the handler (and a human) to find it.
+export const sectionFeedback = (heading: Heading, comment: string): string =>
+  `Re: ${heading.text} (#${heading.slug})\n\n${comment.trim()}`
