@@ -17,7 +17,7 @@ export function ActionBar({ fileId, actions }: { fileId: string; actions: Issued
   const run = async (a: IssuedAction) => {
     setStatus({ state: 'processing', label: a.label })
     try {
-      const res = await runAction({ data: { id: fileId, actionId: a.id, nonce: a.nonce, token: a.token, feedback } })
+      const res = await runAction({ data: { id: fileId, actionId: a.id, nonce: a.nonce, token: a.token, head: a.head, feedback } })
       if (!res.ok) return setStatus({ state: 'failure', message: res.error })
       const accepted = res.verdict === 'accept'
       setStatus({

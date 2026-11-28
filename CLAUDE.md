@@ -55,6 +55,7 @@ published on `127.0.0.1:7777` only. The CLI stays on the host and writes the reg
 |---|---|
 | `~/.asset-serve` → `/data` (rw) | registry (written by host CLI) and `preferences.json` (written by the viewer) |
 | `${ASSET_SERVE_DOCS:-~/Documents}` → same path (ro) | the registry stores absolute host paths, so files must appear at the same path |
+| `${ASSET_SERVE_ROADMAPS:-/home/ai-docs/roadmaps}` → same path (ro) | roadmap git repos; the image ships git with `safe.directory '*'` so it can read their HEAD |
 
 - After changing viewer code: `docker compose up -d --build`.
 - Files outside the mounted folder show "missing on disk".
@@ -103,7 +104,9 @@ Ports: built viewer (`serve`, `open`, `pnpm preview`) on **7777**; dev server
 | Path | Role |
 |---|---|
 | `src/lib/registry.ts` | Shared by CLI and server. `~/.asset-serve/registry.json` (override with `ASSET_SERVE_HOME`). Metadata only. id = first 8 hex chars of sha1(absolute path). Atomic write via temp file + rename. |
-| `src/cli.ts`, `bin/asset-serve.mjs` | `add` (file/folder/glob, `--title`, `--tags`; opt-in `--interactive`, repeatable `--action id:label`, `--handler` + `--context` which write the optional `interactive`/`actions`/`callback` entry fields, only when given), `list`, `rm <id\|path>`, `open`, `serve [--dev]`. The bin is a shim that imports `src/cli.ts`. |
+| `src/cli.ts`, `bin/asset-serve.mjs` | `add` (file/folder/glob, `--title`, `--tags`; opt-in `--interactive`, repeatable `--action id:label`, `--handler` + `--context` which write the optional `interactive`/`actions`/`callback` entry fields, only when given), `list`, `rm <id\|path>`, `get <id>`, `open`, `serve [--dev]`, `roadmap <product> <file.md>` (content on stdin; prints `committed <sha>  <path>  (id <id>)`). `roadmap` is for the roadmap writer, not general agents, so the paste-ready agent block and the global `~/.claude/CLAUDE.md` section leave it out: their commands, output lines, errors, ports and URLs are unchanged. The bin is a shim that imports `src/cli.ts`. |
+| `src/server/roadmap.ts` | Roadmap revisions in git: one repo per product under `/home/ai-docs/roadmaps/<product>/` (`ASSET_SERVE_ROADMAPS` overrides). First write runs `git init` and commits a `*.tmp` `.gitignore`; every write (temp + rename) is one commit by an inline bot identity (`-c user.name/user.email`, no global config). On failure the file is restored from HEAD, or removed if never committed. CLI: `asset-serve roadmap <product> <file.md>` reads content from stdin. Same path every revision, so `/f/<id>` is stable. |
+| `src/server/actions.ts` | Action tokens are also signed with the roadmap repo's short HEAD (`''` outside a roadmap repo); a click after HEAD moved gets "roadmap moved on, reload". Each nonce runs once: spent nonces are kept in `~/.asset-serve/spent-nonces.json` (last 10 000). |
 | `src/server/hub.ts` | One process-wide chokidar watcher, kept on `globalThis` so it survives HMR. Watches the registry **directory** (rename-based writes) plus every registered file. Throttles per file: leading edge, then at most one event per 100 ms. |
 | `src/routes/api/events.ts` | SSE endpoint, events `{type:'registry'}` and `{type:'file', id}`. 15 s keepalive ping. |
 | `src/routes/api/asset.$id.ts` | `GET /api/asset/<id>?p=<relative path>`: serves images referenced relatively in a registered md file. Resolves `p` against that file's folder with `realpath` on both sides and refuses anything outside that tree (`../`, symlinks, absolute paths, schemes). png/jpg/jpeg/gif/svg/webp only, 20 MB cap, read fresh each time, `nosniff` + sandbox CSP (SVG). `MarkdownView` rewrites relative `<img src>` to this route via `FileIdContext`. |
