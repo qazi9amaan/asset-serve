@@ -17,6 +17,7 @@ services:
       ASSET_SERVE_POLL: "${ASSET_SERVE_POLL:-0}"
       # Set a password to require login. Leave unset for open access.
       ASSET_SERVE_PASSWORD: "${ASSET_SERVE_PASSWORD:-}"
+      ASSET_SERVE_ROADMAPS: "${ASSET_SERVE_ROADMAPS:-/home/ai-docs/roadmaps}"
     volumes:
       # Registry and preferences (the host CLI writes the registry).
       - "${HOME}/.asset-serve:/data"
@@ -24,3 +25,5 @@ services:
       # same path, read-only. Files outside this folder show as "missing".
       # Override with ASSET_SERVE_DOCS=/some/other/dir.
       - "${ASSET_SERVE_DOCS:-${HOME}/Documents}:${ASSET_SERVE_DOCS:-${HOME}/Documents}:ro"
+      # Roadmap git repos (written by `asset-serve roadmap` on the host), same path, read-only.
+      - "${ASSET_SERVE_ROADMAPS:-/home/ai-docs/roadmaps}:${ASSET_SERVE_ROADMAPS:-/home/ai-docs/roadmaps}:ro"

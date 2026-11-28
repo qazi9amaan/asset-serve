@@ -41,13 +41,18 @@ export const registerHandler = (name: string, fn: ActionHandler) => void handler
 const NONCES_PATH = join(HOME_DIR, 'spent-nonces.json')
 const MAX_NONCES = 10_000
 
+// Only a missing file means "none spent"; anything else throws so the guard fails closed.
 function readSpent(): string[] {
+  let raw: string
   try {
-    const data = JSON.parse(readFileSync(NONCES_PATH, 'utf8'))
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
+    raw = readFileSync(NONCES_PATH, 'utf8')
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw err
   }
+  const data = JSON.parse(raw)
+  if (!Array.isArray(data)) throw new Error('spent-nonces.json is not a list')
+  return data
 }
 
 function writeSpent(nonces: string[]): void {
@@ -110,9 +115,13 @@ export async function dispatchAction(req: ActionRequest): Promise<DispatchResult
   if (!entry.callback || !handler) return { ok: false, error: 'No registered handler for this file.' }
 
   // Check and mark in one synchronous step, so two clicks can't both pass.
-  const spent = readSpent()
-  if (spent.includes(req.nonce)) return { ok: false, error: 'This action was already used. Reload the file to act again.' }
-  writeSpent([...spent, req.nonce])
+  try {
+    const spent = readSpent()
+    if (spent.includes(req.nonce)) return { ok: false, error: 'This action was already used. Reload the file to act again.' }
+    writeSpent([...spent, req.nonce])
+  } catch {
+    return { ok: false, error: "Couldn't check or record used actions, so nothing ran. Check the server's data folder." }
+  }
 
   const event: ActionEvent = {
     event_id: randomUUID(),

@@ -59,12 +59,16 @@ export function writeRoadmap(product: string, filename: string, content: string)
     git(dir, 'commit', '-q', '--allow-empty', '-m', `update ${filename}`)
   } catch (err) {
     rmSync(tmp, { force: true })
+    // A git error here is reported, never read as "not committed", so a committed doc is never deleted.
     try {
-      git(dir, 'cat-file', '-e', `HEAD:${filename}`)
-      git(dir, 'checkout', 'HEAD', '--', filename)
-    } catch {
-      git(dir, 'rm', '-q', '--cached', '--ignore-unmatch', '--', filename)
-      rmSync(path, { force: true })
+      if (git(dir, 'ls-tree', '--name-only', 'HEAD', '--', filename)) {
+        git(dir, 'checkout', 'HEAD', '--', filename)
+      } else {
+        git(dir, 'rm', '-q', '--cached', '--ignore-unmatch', '--', filename)
+        rmSync(path, { force: true })
+      }
+    } catch (rollbackErr) {
+      throw new Error(`Roadmap write failed (${err}) and rollback failed (${rollbackErr}); ${path} left as is.`)
     }
     throw err
   }

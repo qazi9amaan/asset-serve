@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, test } from 'node:test'
@@ -104,4 +104,13 @@ test('the same action token runs at most once', async () => {
   assert.equal(again.ok, false)
   assert.match((again as { error: string }).error, /already used/)
   assert.equal(calls, 1)
+})
+
+test('a corrupt spent-nonce file turns actions away instead of forgetting them', async () => {
+  const { req } = setup('eta')
+  writeFileSync(join(home, 'spent-nonces.json'), '{broken')
+  const res = await dispatchAction(req)
+  assert.equal(res.ok, false)
+  assert.match((res as { error: string }).error, /Couldn't check or record used actions/)
+  assert.equal(calls, 0)
 })
