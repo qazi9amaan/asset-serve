@@ -56,6 +56,21 @@ export const deleteFile = createServerFn({ method: 'POST' })
     return { removed: true }
   })
 
+// Runs an agent-defined action: checks the signed token, then forwards an event
+// to the entry's server-side handler and returns its accept/reject verdict.
+export const runAction = createServerFn({ method: 'POST' })
+  .validator((d: { id: string; actionId: string; nonce: string; token: string; feedback?: string }) => ({
+    id: String(d.id),
+    actionId: String(d.actionId),
+    nonce: String(d.nonce),
+    token: String(d.token),
+    feedback: String(d.feedback ?? '').slice(0, 5000),
+  }))
+  .handler(async ({ data }) => {
+    const { dispatchAction } = await import('#/server/actions')
+    return dispatchAction(data)
+  })
+
 export interface ContentHit {
   id: string
   title: string
