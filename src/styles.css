@@ -619,6 +619,92 @@ html[data-font="serif"] .md :is(h1, h2, h3) {
     opacity: 1;
   }
 }
+/* Section comment: speech-bubble left of the fold chevron, inline box below the H2 */
+.md-comment {
+  position: absolute;
+  top: 0.55em;
+  left: -3.5rem;
+  display: flex;
+  height: 1.4rem;
+  width: 1.4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 150ms ease, background-color 150ms ease;
+}
+.md-block[data-head]:hover .md-comment,
+.md-comment:focus-visible,
+.md-comment[aria-expanded="true"] {
+  opacity: 1;
+}
+.md-comment:hover {
+  background: #ffffff10;
+  color: var(--strong);
+}
+@media (hover: none), (max-width: 640px) {
+  .md-comment {
+    position: static;
+    float: right;
+    margin-top: 0.35em;
+    opacity: 1;
+  }
+}
+.md-comment-box {
+  margin-top: 0.6em;
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+.md-comment-box textarea {
+  width: 100%;
+  resize: vertical;
+  border-radius: 6px;
+  background: #00000033;
+  padding: 0.5rem 0.75rem;
+  color: var(--strong);
+}
+.md-comment-box textarea::placeholder {
+  color: var(--muted);
+}
+.md-comment-box textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px #ffffff26;
+}
+.md-comment-bar {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.md-comment-bar p {
+  margin: 0 auto 0 0;
+  font-size: 13px;
+}
+.md-comment-bar button {
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  font-size: 13px;
+  color: var(--muted);
+}
+.md-comment-bar button:hover {
+  color: var(--strong);
+}
+.md-comment-bar button.is-primary {
+  background: #ffffff0f;
+  font-weight: 500;
+  color: var(--strong);
+}
+.md-comment-bar button.is-primary:hover {
+  background: #ffffff1a;
+}
+.md-comment-bar button:disabled {
+  opacity: 0.6;
+}
 .md-fold-hint {
   margin-top: 0.4em;
   font-family: var(--font-ui);
