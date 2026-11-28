@@ -1,7 +1,7 @@
 // Password gate. Active only when ASSET_SERVE_PASSWORD is set; otherwise the
 // app is fully open (unchanged behavior). Server-only: imported dynamically so
 // node:crypto never reaches the client bundle, like the rest of src/server.
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 const COOKIE = 'asset-serve-session'
 const MAX_AGE = 60 * 60 * 24 * 30 // 30 days
@@ -26,3 +26,21 @@ export function isAuthed(request: Request, password: string): boolean {
 }
 
 export const passwordMatches = (submitted: string, password: string) => safeEqual(submitted, password)
+
+// Interactive action tokens: an HMAC over one exact asset/revision/action/nonce
+// tuple, so a token can't be replayed on another doc, a newer revision, or
+// another action. Without ASSET_SERVE_SECRET, a random per-process key is used
+// (tokens then stop working after a restart, fine for short-lived actions).
+export type ActionTokenFields = { assetId: string; revision: string; actionId: string; nonce: string }
+
+let fallbackSecret: string | undefined
+const actionSecret = () =>
+  process.env.ASSET_SERVE_SECRET || (fallbackSecret ??= randomBytes(32).toString('hex'))
+
+// JSON array encoding keeps distinct tuples distinct (no separator collisions).
+const actionMessage = (f: ActionTokenFields) => JSON.stringify([f.assetId, f.revision, f.actionId, f.nonce])
+
+export const signActionToken = (f: ActionTokenFields) =>
+  createHmac('sha256', actionSecret()).update(actionMessage(f)).digest('hex')
+
+export const verifyActionToken = (token: string, f: ActionTokenFields) => safeEqual(token, signActionToken(f))

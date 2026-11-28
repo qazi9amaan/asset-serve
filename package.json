@@ -11,6 +11,8 @@
     "build": "vite build",
     "preview": "vite preview --port 7777",
     "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit",
+    "test": "node --test src/server/auth.test.ts",
     "cli": "node bin/asset-serve.mjs",
     "start": "node bin/asset-serve.mjs serve"
   },
